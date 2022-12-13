@@ -1,9 +1,6 @@
 ﻿# Define a list of programs to install
 $programsToInstall = Get-Content programs.txt
 
-# Set the error action preference to automatically handle non-terminating errors
-$ErrorActionPreference = "Continue"
-
 # Update all installed packages
 winget upgrade --all
 
