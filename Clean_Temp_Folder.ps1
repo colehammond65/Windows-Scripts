@@ -15,7 +15,9 @@ foreach ($item in $tempItemsBefore) {
 $tempItemsAfter = Get-ChildItem $tempFolder
 if ($tempItemsAfter.Count -le $tempItemsBefore.Count) {
     Write-Host "Temp folder cleaned."
+    pause
 }
 else {
     Write-Host "The temp folder could not be emptied."
+    pause
 }
