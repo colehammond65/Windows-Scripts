@@ -1,15 +1,18 @@
-
 # Powershell Scripts  
 
 Random Powershell scripts I use to automate various things in Windows
 Just starting to learn Powershell scripts so things may not be done the 'correct' way
 
-
-
 ## Authors
 
 - [@colehammond65](https://www.github.com/colehammond65)
 
+
+## Run Windows Setup
+
+```bash
+irm https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/Master.ps1 | iex
+```
 
 ## Run Locally
 
