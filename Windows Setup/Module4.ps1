@@ -9,11 +9,23 @@ function Get-DirectorySize {
     param ($path)
     try {
         if (Test-Path $path) {
-            $size = (Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-            return $size
+            $items = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue
+            if ($items) {
+                $validItems = $items | Where-Object { $_.GetType().GetProperty("Length") -ne $null }
+                if ($validItems) {
+                    $size = ($validItems | Measure-Object -Property Length -Sum).Sum
+                    return $size
+                } else {
+                    return 0  # No valid items found with "Length" property, return 0
+                }
+            } else {
+                return 0  # No items found, return 0
+            }
+        } else {
+            return 0  # Directory doesn't exist, return 0
         }
     } catch {
-        return 0
+        return 0  # Error occurred, return 0
     }
 }
 

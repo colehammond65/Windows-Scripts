@@ -1,6 +1,18 @@
-﻿# Ensure the script is run as an administrator
-if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\System_Clean.ps1`"" -Verb RunAs
+﻿# Function to check if running as administrator
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# If not running as administrator, restart the script with elevated privileges
+if (-not (Test-Administrator)) {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $arguments = [Environment]::GetCommandLineArgs() -join ' '
+
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $arguments" -Verb RunAs
+
+    # Exit the current script
     exit
 }
 
@@ -9,11 +21,23 @@ function Get-DirectorySize {
     param ($path)
     try {
         if (Test-Path $path) {
-            $size = (Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-            return $size
+            $items = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue
+            if ($items) {
+                $validItems = $items | Where-Object { $_.GetType().GetProperty("Length") -ne $null }
+                if ($validItems) {
+                    $size = ($validItems | Measure-Object -Property Length -Sum).Sum
+                    return $size
+                } else {
+                    return 0  # No valid items found with "Length" property, return 0
+                }
+            } else {
+                return 0  # No items found, return 0
+            }
+        } else {
+            return 0  # Directory doesn't exist, return 0
         }
     } catch {
-        return 0
+        return 0  # Error occurred, return 0
     }
 }
 
@@ -270,5 +294,5 @@ function Convert-Size {
 $freedSpaceReadable = Convert-Size $totalFreedSpace
 Write-Host "Total space freed: $freedSpaceReadable"
 
-Write-Host "Program installation completed. Press any key to exit..."
+Write-Host "Cleanup Complete"
 [void][System.Console]::ReadKey($true)
