@@ -1,6 +1,6 @@
 # Ensure the script is run as an administrator
 if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\module1.ps1`"" -Verb RunAs
+    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module1.ps1`"" -Verb RunAs
     exit
 }
 
@@ -24,6 +24,51 @@ function Disable-FocusAssist {
     Write-Host "Focus Assist disabled."
 }
 
+function Enable-UltimatePerformance {
+    # Name of the Ultimate Performance power plan
+    $planName = "Ultimate Performance"
+
+    try {
+        # Function to extract the GUID from the powercfg output
+        function Get-PowerPlanGuid {
+            param (
+                [string]$planName
+            )
+            $output = powercfg -list | Select-String -Pattern $planName
+            if ($output) {
+                # Extract the GUID from the output
+                if ($output -match "Power Scheme GUID: ([a-fA-F0-9\-]+)") {
+                    return $matches[1]
+                }
+            }
+            return $null
+        }
+
+        # Check if the 'Ultimate Performance' power plan exists
+        $guid = Get-PowerPlanGuid -planName $planName
+
+        if (-not $guid) {
+            # Create the 'Ultimate Performance' power plan
+            powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 | Out-Null
+            Write-Output "Ultimate Performance power plan created."
+
+            # Check again if the 'Ultimate Performance' power plan now exists
+            $guid = Get-PowerPlanGuid -planName $planName
+        }
+
+        if ($guid) {
+            # Set the 'Ultimate Performance' power plan as active
+            powercfg -setactive $guid
+            Write-Output "Ultimate Performance power plan enabled with GUID: $guid"
+        } else {
+            Write-Error "Failed to create or find the Ultimate Performance power plan."
+        }
+    }
+    catch {
+        Write-Error "An error occurred: $_"
+    }
+}
+
 function Set-NeverSleep {
     powercfg -change -monitor-timeout-ac 0
     powercfg -change -monitor-timeout-dc 0
@@ -32,12 +77,28 @@ function Set-NeverSleep {
     Write-Host "Screen set to never turn off or go to sleep."
 }
 
-function Set-HighPerformancePowerPlan {
-    powercfg -setactive SCHEME_MIN
-    Write-Host "Power plan set to High performance."
+function Set-HAGS {
+    # Enable Hardware-accelerated GPU scheduling
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
+    $regName = "HwSchMode"
+    $regValue = 2
+
+    # Check if the registry path exists
+    if (-Not (Test-Path $regPath)) {
+        Write-Host "Registry path does not exist. Creating the path..."
+        New-Item -Path $regPath -Force | Out-Null
+    }
+
+    # Set the registry value
+    try {
+        Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Type DWord
+        Write-Host "Hardware-accelerated GPU scheduling has been enabled successfully."
+    } catch {
+        Write-Host "Failed to enable Hardware-accelerated GPU scheduling: $_"
+    }
 }
 
-function Configure-StorageSense {
+function Set-StorageSense {
     $storageSensePath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy"
     if (-not (Test-Path $storageSensePath)) {
         New-Item -Path $storageSensePath -Force | Out-Null
@@ -130,9 +191,10 @@ function Disable-GameMode {
 # Main script execution
 Set-SystemName
 Disable-FocusAssist
+Enable-UltimatePerformance
 Set-NeverSleep
-Set-HighPerformancePowerPlan
-Configure-StorageSense
+Set-HAGS
+Set-StorageSense
 Disable-WindowsTimeline
 Enable-ClipboardHistory
 Disable-MouseAcceleration
@@ -145,4 +207,4 @@ Disable-GameMode
 Write-Host "Configuration complete. Some changes may require a restart to take effect."
 
 # Start Module 2
-Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\module2.ps1`"" -Wait
+Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module2.ps1`"" -Wait

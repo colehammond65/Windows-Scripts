@@ -1,6 +1,6 @@
-# Ensure the script is run as an administrator
+﻿# Ensure the script is run as an administrator
 if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module4.ps1`"" -Verb RunAs
+    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\System_Clean.ps1`"" -Verb RunAs
     exit
 }
 
@@ -270,5 +270,5 @@ function Convert-Size {
 $freedSpaceReadable = Convert-Size $totalFreedSpace
 Write-Host "Total space freed: $freedSpaceReadable"
 
-# Start Module 5
-Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module5.ps1`"" -Wait
+Write-Host "Program installation completed. Press any key to exit..."
+[void][System.Console]::ReadKey($true)

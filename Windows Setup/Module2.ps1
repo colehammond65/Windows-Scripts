@@ -1,6 +1,6 @@
 # Ensure the script is run as an administrator
 if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\module2.ps1`"" -Verb RunAs
+    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module2.ps1`"" -Verb RunAs
     exit
 }
 
@@ -40,4 +40,4 @@ Update-EverythingElse
 Write-Host "All updates completed."
 
 # Start Module 3
-Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\module3.ps1`"" -Wait
+Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module3.ps1`"" -Wait
