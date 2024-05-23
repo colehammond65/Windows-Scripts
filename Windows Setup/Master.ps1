@@ -1,10 +1,10 @@
 # URLs of the scripts
 $scriptUrls = @(
-    "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/bootstrap.bat",
     "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/Module1.ps1",
     "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/Module2.ps1",
     "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/Module3.ps1",
     "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/Module4.ps1",
+    "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/Module5.ps1",
     "https://raw.githubusercontent.com/colehammond65/PowerShell-Scripts/main/Windows%20Setup/programs.txt"
 )
 
