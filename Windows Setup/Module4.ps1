@@ -1,6 +1,18 @@
-# Ensure the script is run as an administrator
-if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module4.ps1`"" -Verb RunAs
+# Function to check if running as administrator
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# If not running as administrator, restart the script with elevated privileges
+if (-not (Test-Administrator)) {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $arguments = [Environment]::GetCommandLineArgs() -join ' '
+
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $arguments" -Verb RunAs
+
+    # Exit the current script
     exit
 }
 
@@ -8,13 +20,13 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 function Get-DirectorySize {
     param ($path)
     try {
-        if (Test-Path $path) {
-            $items = Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -Path $path) {
+            $items = Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue
             if ($items) {
-                $validItems = $items | Where-Object { $_.GetType().GetProperty("Length") -ne $null }
+                $validItems = $items | Where-Object { $_.PSIsContainer -eq $false -and $_.GetType().GetProperty("Length") -ne $null }
                 if ($validItems) {
                     $size = ($validItems | Measure-Object -Property Length -Sum).Sum
-                    return $size
+                    return [math]::Max([int64]0, [int64]$size)  # Ensure the size is non-negative and use Int64
                 } else {
                     return 0  # No valid items found with "Length" property, return 0
                 }
@@ -32,6 +44,7 @@ function Get-DirectorySize {
 # Function to clear a directory and return freed space
 function Clear-Directory {
     param ($path)
+    Write-Host "Cleaning directory: $path"  # Show the current directory being processed
     try {
         $initialSize = Get-DirectorySize $path
         if ($initialSize -gt 0) {
@@ -199,12 +212,12 @@ function Invoke-DiskCleanup {
         }
     )
 
-    # Apply the registry keys
+    # Apply each registry setting
     foreach ($key in $registryKeys) {
-        Set-ItemProperty -Path $key.Path -Name $key.Name -Value $key.Value
+        New-ItemProperty -Path $key.Path -Name $key.Name -Value $key.Value -PropertyType DWORD -Force | Out-Null
     }
 
-    # Run the cleanmgr command with sagerun:7 option
+    # Run Disk Cleanup
     Start-Process -FilePath "cleanmgr.exe" -ArgumentList "/sagerun:7"
 }
 
@@ -212,50 +225,29 @@ $totalFreedSpace = 0
 
 Write-Host "Cleaning, please wait..."
 
-Invoke-DiskCleanup
-
-# Clear Windows Temp folders
+# Clear Temp folders
 $totalFreedSpace += Clear-Directory "C:\Windows\Temp"
 $totalFreedSpace += Clear-Directory "$env:TEMP"
 $totalFreedSpace += Clear-Directory "$env:TMP"
-
-# Clear user Temp folders
 $totalFreedSpace += Clear-Directory "$env:USERPROFILE\AppData\Local\Temp"
-
-# Clear Recycle Bin
-try {
-    $recycleBin = New-Object -ComObject Shell.Application
-    $recycleBinItems = $recycleBin.Namespace(0xA).Items()
-    $recycleBinSize = ($recycleBinItems | Measure-Object -Property Size -Sum).Sum
-    $recycleBinItems | ForEach-Object { $_.InvokeVerb("empty") }
-    $totalFreedSpace += $recycleBinSize
-} catch {}
 
 # Clear Windows Update Cache
 $totalFreedSpace += Clear-Directory "C:\Windows\SoftwareDistribution\Download"
 
-# Clear Nvidia Shader Cache
+# Clear Shader Cache
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\NVIDIA\DXCache"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\NVIDIA\GLCache"
-
-# Clear AMD Shader Cache
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\AMD\GLCache"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\AMD\DxCache"
-
-# Clear Intel Shader Cache
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Intel\ShaderCache"
-
-# Clear other common shader cache locations
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Microsoft\DirectX Shader Cache"
 
-# Additional Cleanups inspired by BleachBit
+#Misc
 $totalFreedSpace += Clear-Directory "$env:APPDATA\Microsoft\Windows\Recent"
 $totalFreedSpace += Clear-Directory "$env:APPDATA\Microsoft\Office\Recent"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache"
 $totalFreedSpace += Clear-Directory "$env:APPDATA\Mozilla\Firefox\Profiles\*.default-release\cache2"
-
-# Additional BleachBit Cleaners
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Temp\*"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\CrashDumps"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Microsoft\Windows\INetCache"
@@ -269,6 +261,17 @@ $totalFreedSpace += Clear-Directory "$env:APPDATA\Mozilla\Firefox\Profiles\*.def
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Packages\*\AC\INetCache"
 $totalFreedSpace += Clear-Directory "$env:LOCALAPPDATA\Packages\*\AC\INetCookies"
 
+# Clear Recycle Bin
+try {
+    $recycleBin = New-Object -ComObject Shell.Application
+    $recycleBinItems = $recycleBin.Namespace(0xA).Items()
+    $recycleBinSize = ($recycleBinItems | Measure-Object -Property Size -Sum).Sum
+    $recycleBinItems | ForEach-Object { $_.InvokeVerb("empty") }
+    $totalFreedSpace += [math]::Max([int64]0, [int64]$recycleBinSize)  # Ensure the size is non-negative and use Int64
+} catch {
+    Write-Error "Error clearing Recycle Bin: $_"
+}
+
 # Convert bytes to a human-readable format
 function Convert-Size {
     param ($size)
@@ -279,8 +282,14 @@ function Convert-Size {
     return "$size bytes"
 }
 
+# Print end screen and run disk clean-up
 $freedSpaceReadable = Convert-Size $totalFreedSpace
+Write-Host "Cleanup Complete"
 Write-Host "Total space freed: $freedSpaceReadable"
+Write-Host "Running Disk Clean-up for good measure"
+Write-Host "Press any key to close..."
+Invoke-DiskCleanup
+[void][System.Console]::ReadKey($true)
 
 # Start Module 5
 Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Module5.ps1`"" -Wait
